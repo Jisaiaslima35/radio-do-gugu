@@ -133,27 +133,20 @@ if [ -x /root/radio-gugu-music/scripts/keep-autodj-alive.sh ]; then
 fi
 
 # === Injeta no DJ mount da estação 4 do AzuraCast ===
-# FIX 29/08/2026 02:35 — Pre-padding 3s silêncio no arquivo.
-# Isaías reportou (msg 3113): "o buffer do Harbor/Liquidsoap engole os últimos
-# segundos antes de tocar tudo". Solução: pre-concat 3s silêncio CAUDA no
-# arquivo (filter_complex anullsrc). Quando ffmpeg desconecta no EOF, o
-# liquidsoap tem 3s extras de silêncio pra drenar antes de trocar pro AutoDJ.
-#
-# ROLLBACK 29/08/2026 02:42 — Removido `-map_metadata -1 -write_xing 0
-# -id3v2_version 0` (causou "bip chato" reportado msg 3114: liquidsoap entrou
-# em loop curto após ffmpeg sair). Strip metadata evita "int_of_string" aos
-# 15s MAS causa artefatos feios na transição. Solução final: pre-pad SIM,
-# strip metadata NÃO. A fala pode cortar uns segundos no final (int_of_string
-# após ~15s) mas a transição fica limpa.
-#
-# Flag -re mantida (transmite em tempo real 1x exato).
-# Buffer do harbor mantido em 5.0 (conservador vs 2.0 sugerido).
+# FIX 29/08/2026 02:55 — Rollback -map_metadata -1 (causou bip chato msg 3118).
+# Isaías (msg 3117) sugeriu -map_metadata -1 + buffer=2.0 + pre-pad 5s.
+# Teste E2E 02:50: fala 90s tocou 1m33s (vs 58s anterior) MAS transição
+# pra AutoDJ ficou em loop curto de 2-3s antes do switch final = "bip chato"
+# (msg 3118). Hipótese refutada: strip metadata inline não evita int_of_string
+# residual E piora a transição.
+# Mantido: pre-pad 5s silêncio + buffer=2.0 + -re. Removido: -map_metadata -1.
+# A fala toca ~80% do tempo antes do int_of_string mas a transição sai limpa.
 LOG="/tmp/inject-gugu-$$.log"
 TMP_FINAL_PADDED="/tmp/inject_gugu_final_$$.mp3"
-# Pre-concat 3s silêncio cauda (sempre, independente do modo)
+# Pre-concat 5s silêncio cauda (sempre, independente do modo)
 ffmpeg -hide_banner -loglevel error -y \
   -i "$ARQUIVO_INJECT" \
-  -f lavfi -t 3 -i "anullsrc=r=44100:cl=stereo" \
+  -f lavfi -t 5 -i "anullsrc=r=44100:cl=stereo" \
   -filter_complex "[0:a]asetpts=PTS-STARTPTS[v];[1:a]asetpts=PTS-STARTPTS[s];[v][s]concat=n=2:v=0:a=1[out]" \
   -map "[out]" \
   -c:a libmp3lame -b:a 128k -ar 44100 -ac 2 \
