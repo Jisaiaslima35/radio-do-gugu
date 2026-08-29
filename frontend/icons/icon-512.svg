@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#1a0a2e"/>
+      <stop offset="100%" stop-color="#0a0a0f"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)" rx="80"/>
+  <g filter="url(#glow)">
+    <text x="256" y="316" text-anchor="middle" font-family="Georgia,serif" font-size="220" font-style="italic" font-weight="700" fill="#ff2d2d">G</text>
+  </g>
+  <circle cx="100" cy="100" r="10" fill="#ff2d2d" opacity="0.8"/>
+  <circle cx="412" cy="100" r="8" fill="#5b2a86" opacity="0.8"/>
+  <circle cx="100" cy="412" r="8" fill="#5b2a86" opacity="0.8"/>
+  <circle cx="412" cy="412" r="10" fill="#ff2d2d" opacity="0.8"/>
+  <text x="256" y="450" text-anchor="middle" font-family="Georgia,serif" font-size="36" font-style="italic" fill="#8e8ea0">contos de terror</text>
+</svg>

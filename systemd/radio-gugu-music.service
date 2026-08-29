@@ -1,0 +1,24 @@
+[Unit]
+Description=Rádio do Gugu Backend (Node + Socket.IO) — Contos de Terror
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+SupplementaryGroups=docker
+WorkingDirectory=/opt/radio-do-gugu/backend
+ExecStart=/usr/bin/node server.cjs
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+# Logs estruturados (Systemd journal + arquivo)
+StandardOutput=append:/opt/radio-do-gugu/logs/backend.log
+StandardError=append:/opt/radio-do-gugu/logs/backend.log
+
+# Limites
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Rádio do Gugu — Contos de Terror</title>
+    <meta name="description" content="Rádio 24h com locutor virtual Gugu. Contos de terror, brega que não perdoa e o medo que corre na veia. Mural público, sala privada e pedidos no ar.">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Rádio do Gugu">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- PLAYER FULL-WIDTH NO TOPO -->
+    <div class="topbar" id="topbar">
+        <div class="topbar-inner">
+            <button class="lp-play" id="lp-play" aria-label="Tocar rádio" type="button">
+                <svg id="lp-ico-play" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="lp-ico-pause" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true" hidden><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+                <span id="lp-spinner" class="lp-spinner" hidden></span>
+            </button>
+            <div class="lp-info">
+                <div class="lp-line1">
+                    <span class="lp-dot" id="lp-dot"></span>
+                    <span class="lp-live" id="lp-state">AO VIVO</span>
+                    <span class="lp-name">Rádio do Gugu</span>
+                </div>
+                <div class="lp-line2" id="lp-now">Contos de terror — 24h no ar</div>
+            </div>
+            <div class="lp-controls">
+                <button class="lp-mute" id="lp-mute" aria-label="Mudo" type="button">
+                    <svg id="lp-ico-vol" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05A4.47 4.47 0 0 0 16.5 12zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                    <svg id="lp-ico-mute" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" hidden><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zM19 12c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+                </button>
+                <input type="range" class="lp-range" id="lp-volume" min="0" max="100" value="80" aria-label="Volume">
+                <div class="online-badge">
+                    <span class="online-dot"></span>
+                    <span id="online-count">0</span>
+                </div>
+            </div>
+            <audio id="lp-audio" preload="auto" crossorigin="anonymous">
+                <source src="https://radiodogugu.automacaojs.us/stream" type="audio/mpeg">
+            </audio>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="header">
+        <a href="/" class="logo">
+            <span class="logo-icon">🎙️</span>
+            <span class="logo-text">Rádio do<br><em>Gugu</em></span>
+            <span class="logo-sub">Contos de Terror • Brega</span>
+        </a>
+    </header>
+
+    <main class="container">
+        <!-- ABA 1 — MURAL PÚBLICO -->
+        <section id="tab-mural" class="tabs active" aria-label="Mural público de pedidos">
+            <h2><span class="accent">🩸</span> Mural do Medo</h2>
+            <p class="section-sub">Pedidos que vão ao ar com a voz do Gugu.</p>
+
+            <form id="mural-form" class="mural-form card">
+                <input type="text" id="mural-nome" placeholder="✍️ Seu nome (ou apelido)" required maxlength="32">
+                <textarea id="mural-pedido" placeholder="🕯️ Acenda seu pedido — música brega OU conto de terror..." required maxlength="500"></textarea>
+                <button type="submit" class="btn btn-primary btn-block">� Manda pro Ar</button>
+            </form>
+
+            <div id="mural-cards" class="mural-list">
+                <div class="empty-state">Nenhum pedido ainda. Sê o primeiro a gritar no escuro.</div>
+            </div>
+        </section>
+
+        <!-- ABA 2 — PEDIDO MÚSICA -->
+        <section id="tab-musica" class="tabs" aria-label="Pedir música brega">
+            <h2><span class="accent" style="color: var(--green);">🪩</span> Pedir Brega</h2>
+            <p class="section-sub">Toque o brega que não perdoa. 1 clique e vai pro ar.</p>
+
+            <div id="catalogo-info" class="loading">Carregando catálogo</div>
+            <div id="catalogo-grid" class="catalogo-grid"></div>
+        </section>
+
+        <!-- ABA 3 — PEDIDO CONTO -->
+        <section id="tab-conto" class="tabs" aria-label="Pedir conto de terror">
+            <h2><span class="accent-purple">📖</span> Pedir Conto</h2>
+            <p class="section-sub">Escolha um conto ou peça um tema. O Gugu narra ao vivo.</p>
+
+            <div class="sugestoes-contos" id="sugestoes-contos">
+                <button class="sugestao-chip" data-conto="A mulher do necrotério">A mulher do necrotério</button>
+                <button class="sugestao-chip" data-conto="O último andar">O último andar</button>
+                <button class="sugestao-chip" data-conto="A criança do espelho">A criança do espelho</button>
+                <button class="sugestao-chip" data-conto="Sussurro na floresta">Sussurro na floresta</button>
+                <button class="sugestao-chip" data-conto="O relógio da avó">O relógio da avó</button>
+                <button class="sugestao-chip" data-conto="Chamado no telefone">Chamado no telefone</button>
+            </div>
+
+            <form id="conto-form" class="conto-form card">
+                <textarea id="conto-pedido" placeholder="Conte o que você quer ouvir — tema, personagens, época..." required maxlength="500"></textarea>
+                <button type="submit" class="btn btn-primary btn-block">📖 Narra esse Conto</button>
+            </form>
+
+            <div id="conto-resposta"></div>
+        </section>
+
+        <!-- ABA 4 — SALA PRIVADA -->
+        <section id="tab-sala" class="tabs" aria-label="Sala privada com Gugu">
+            <h2><span class="accent-purple">🔒</span> Sala do Gugu</h2>
+            <p class="section-sub">Conversa particular, em voz baixa, sem plateia.</p>
+
+            <div class="card">
+                <p style="margin:0 0 12px">Bate-papo privado com o Gugu. Conte algo, peça um conto, pergunte sobre os ares do nordeste.</p>
+                <a href="/sala.html" class="btn btn-primary btn-block">🔒 Entrar na Sala Privada</a>
+            </div>
+
+            <div class="card">
+                <strong style="display:block;margin-bottom:8px">🎯 O que o Gugu pode fazer:</strong>
+                <ul style="margin:0;padding-left:20px;font-size:13px;color:var(--text-dim);line-height:1.8">
+                    <li>Indicar contos da biblioteca pessoal dele</li>
+                    <li>Sugerir música brega pra situação</li>
+                    <li>Conversar sobre lendas do nordeste</li>
+                    <li>Responde dúvidas sobre o programa</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ABA 5 — STATUS -->
+        <section id="tab-status" class="tabs" aria-label="Status da rádio e fila">
+            <h2><span class="accent">📡</span> Status</h2>
+            <p class="section-sub">Como tá o programa agora.</p>
+
+            <div class="status-grid">
+                <div class="status-card" id="status-stream">
+                    <div class="status-card-icon">📻</div>
+                    <div class="status-card-label">Stream</div>
+                    <div class="status-card-value">Online</div>
+                </div>
+                <div class="status-card" id="status-locutor">
+                    <div class="status-card-icon">🎙️</div>
+                    <div class="status-card-label">Locutor</div>
+                    <div class="status-card-value">Gugu</div>
+                </div>
+                <div class="status-card" id="status-mural">
+                    <div class="status-card-icon">🩸</div>
+                    <div class="status-card-label">Mural</div>
+                    <div class="status-card-value">Ativo</div>
+                </div>
+                <div class="status-card" id="status-sala">
+                    <div class="status-card-icon">🔒</div>
+                    <div class="status-card-label">Sala</div>
+                    <div class="status-card-value">Aberta</div>
+                </div>
+            </div>
+
+            <h2 style="margin-top:24px"><span class="accent-purple">⏳</span> Fila do Ar</h2>
+            <p class="section-sub">O que vai tocar depois da música atual.</p>
+
+            <div id="fila-itens">
+                <div class="empty-state">Fila vazia. Pode mandar o primeiro pedido.</div>
+            </div>
+
+            <div class="stats-row">
+                <div>
+                    <strong id="stat-processadas">0</strong>
+                    <small style="color:var(--text-dim);font-size:11px">Faladas hoje</small>
+                </div>
+                <div>
+                    <strong id="stat-tempo">0s</strong>
+                    <small style="color:var(--text-dim);font-size:11px">Última fala</small>
+                </div>
+                <div>
+                    <strong id="stat-fila">0</strong>
+                    <small style="color:var(--text-dim);font-size:11px">Na fila</small>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- TAB BAR (bottom) -->
+    <nav class="tab-bar" role="tablist" aria-label="Navegação principal">
+        <button class="tab active" data-tab="mural" role="tab" aria-selected="true">
+            <span class="tab-icon">🩸</span>
+            <span class="tab-label">Mural</span>
+        </button>
+        <button class="tab" data-tab="musica" role="tab" aria-selected="false">
+            <span class="tab-icon">🪩</span>
+            <span class="tab-label">Brega</span>
+        </button>
+        <button class="tab" data-tab="conto" role="tab" aria-selected="false">
+            <span class="tab-icon">📖</span>
+            <span class="tab-label">Conto</span>
+        </button>
+        <button class="tab" data-tab="sala" role="tab" aria-selected="false">
+            <span class="tab-icon">🔒</span>
+            <span class="tab-label">Sala</span>
+        </button>
+        <button class="tab" data-tab="status" role="tab" aria-selected="false">
+            <span class="tab-icon">�</span>
+            <span class="tab-label">Status</span>
+        </button>
+    </nav>
+
+    <footer class="footer">
+        🩸 Rádio do Gugu — Contos de Terror & Brega que Não Perdoa 🪩
+    </footer>
+
+    <script src="/js/player.js"></script>
+    <script src="/js/app.js"></script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>
