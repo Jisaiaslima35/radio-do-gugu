@@ -57,6 +57,39 @@ var __filename = typeof __filename !== "undefined" ? __filename : (0, import_url
 var __dirname = typeof __dirname !== "undefined" ? __dirname : import_path.default.dirname(__filename);
 
 // =============================================================================
+// TRAVA DE DUPLICIDADE (msg 3421, 02/09/2026)
+// Evita cobrança dupla no MiniMax: mesmo IP/usuário + texto idêntico em <30s
+// =============================================================================
+const DEBOUNCE_MS = 30 * 1000;
+const recentRequests = new Map(); // chave -> timestamp (ms)
+function normalizePedidoKey(p) {
+  return String(p || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 200);
+}
+function getClientIp(req) {
+  const xff = req.headers["x-forwarded-for"];
+  if (typeof xff === "string" && xff.length > 0) return xff.split(",")[0].trim();
+  return req.ip || (req.socket && req.socket.remoteAddress) || "unknown";
+}
+function checkDebounce(req, nome, pedido) {
+  const ip = getClientIp(req);
+  const key = `${ip}|${String(nome || "").toLowerCase().slice(0, 50)}|${normalizePedidoKey(pedido)}`;
+  const now = Date.now();
+  const last = recentRequests.get(key);
+  if (last && (now - last) < DEBOUNCE_MS) {
+    const restamSeg = Math.ceil((DEBOUNCE_MS - (now - last)) / 1000);
+    return { bloqueado: true, ip, key, restamSeg };
+  }
+  recentRequests.set(key, now);
+  // Limpa chaves velhas (>5min) pra não acumular memória indefinidamente
+  if (recentRequests.size > 200) {
+    for (const [k, t] of recentRequests) {
+      if (now - t > 5 * 60 * 1000) recentRequests.delete(k);
+    }
+  }
+  return { bloqueado: false, ip, key };
+}
+
+// =============================================================================
 // CONFIG (específico Gugu)
 // =============================================================================
 var PORT = process.env.PORT || 3006;
@@ -450,28 +483,40 @@ function tentarBuscarContoNaWeb(tituloOriginal, autorOriginal = "Autor Desconhec
 }
 
 function montarFalaContoWeb(nome, titulo, autor, texto, url) {
-  // Pega as primeiras 600-900 chars do conto (depois de título/UI/Markup)
-  // e monta fala Gugu no formato: abertura + trecho + tag "continua no ar"
-  const limpa = String(texto || "")
-    .replace(/\s+/g, " ")
-    .trim();
-  // Heurística: pula título+UI até achar começo de narrativa (frases longas com verbo)
+  // FIX 02/09/2026: trecho de 800 chars era muito pouco — história cortava em
+  // ~2-3% do original. Agora pega 2500 chars concatenando parágrafos até atingir
+  // o cap, com corte inteligente em ". " antes do limite (sem quebrar frase).
+  const MAX_TRECHO = 2500;
   const paragrafos = String(texto || "").split(/\n\n+/);
-  let trecho = "";
+  let trechoAcumulado = "";
   for (const p of paragrafos) {
-    const pLimpo = p.trim();
+    const pLimpo = p.trim().replace(/\s+/g, " ");
     if (!pLimpo) continue;
-    if (pLimpo.length < 60) continue;
-    trecho = pLimpo.slice(0, 800);
-    break;
+    // Cabe? concatena; senão completa até MAX_TRECHO e sai.
+    if (trechoAcumulado.length + pLimpo.length + 1 <= MAX_TRECHO) {
+      trechoAcumulado = trechoAcumulado ? `${trechoAcumulado} ${pLimpo}` : pLimpo;
+    } else {
+      const restante = MAX_TRECHO - trechoAcumulado.length;
+      if (restante > 200) {
+        const pedaco = pLimpo.slice(0, restante);
+        const ultimoPonto = pedaco.lastIndexOf(". ");
+        trechoAcumulado += " " + (ultimoPonto > 100 ? pedaco.slice(0, ultimoPonto + 1) : pedaco);
+      }
+      break;
+    }
   }
-  if (!trecho) trecho = limpa.slice(0, 800);
+  // Fallback: se nenhum parágrafo era >=60 chars, pega do texto limpo
+  if (!trechoAcumulado) {
+    trechoAcumulado = String(texto || "").replace(/\s+/g, " ").trim().slice(0, MAX_TRECHO);
+    const ultimoPonto = trechoAcumulado.lastIndexOf(". ");
+    if (ultimoPonto > 100) trechoAcumulado = trechoAcumulado.slice(0, ultimoPonto + 1);
+  }
   // Sanitiza: tira pontuação estranha / aspas tipográficas
-  trecho = trecho.replace(/["""]/g, '"').replace(/[''']/g, "'");
+  const trecho = trechoAcumulado.replace(/["""]/g, '"').replace(/[''']/g, "'");
   // Abertura estilo Gugu
   const abertura = `${nome}, o Gugu foi buscar essa na coleção da casa. Saiu um conto de ${autor} — "${titulo}" — pra abrir o porão. Ouve só o começo:`;
   const tagFinal = url
-    ? `... continua no porão. Texto completo lá no Wikisource, criatura. Dormia com a luz acesa.`
+    ? `... continua no porão, criatura. Texto completo tá lá no Wikisource pra quem quiser chegar até o fim. Dormia com a luz acesa.`
     : `... continua no porão. Se quiser o final, manda o Gugu repetir a dose.`;
   return `${abertura}\n\n${trecho}\n\n${tagFinal}`;
 }
@@ -629,7 +674,18 @@ function processarProximaLocucao() {
   const t0 = Date.now();
   console.log(`[fila] processando id=${item.id} duration=${item.duration}`);
 
-  const args = [item.fala, `--duration=${item.duration}`];
+  // Cap TTS (msg 3421 + FIX 02/09/2026): pregar (conto web/lenda) = 2500 chars,
+  // curta (brega/salve) = 350 chars. 700 era pouco — cortava história em 2-3%.
+  const MAX_CHARS_TTS = item.duration === "pregar" ? 2500 : 350;
+  let falaParaTTS = item.fala;
+  if (falaParaTTS.length > MAX_CHARS_TTS) {
+    const corte = falaParaTTS.slice(0, MAX_CHARS_TTS);
+    const ultimoPonto = corte.lastIndexOf(". ");
+    falaParaTTS = (ultimoPonto > 100 ? corte.slice(0, ultimoPonto + 1) : corte) + " [...]";
+    console.log(`[tts-cap] fala truncada ${item.fala.length}→${falaParaTTS.length} chars (duration=${item.duration})`);
+  }
+
+  const args = [falaParaTTS, `--duration=${item.duration}`];
   const proc = (0, import_child_process.spawn)("bash", [HERMES_CALL, ...args], {
     detached: true,
     stdio: "ignore"
@@ -745,6 +801,17 @@ app.get("/api/oracoes", (req, res) => {
 app.post("/api/oracoes", async (req, res) => {
   const { nome, pedido, contexto } = req.body || {};
   if (!nome || !pedido) return res.status(400).json({ erro: "nome e pedido obrigatórios" });
+
+  // Trava de duplicidade (msg 3421): mesmo IP+user+texto em <30s → 429
+  const deb = checkDebounce(req, nome, pedido);
+  if (deb.bloqueado) {
+    console.log(`[debounce] BLOQUEADO ip=${deb.ip} nome=${String(nome).slice(0, 30)} "${String(pedido).slice(0, 60)}" — restam ${deb.restamSeg}s`);
+    return res.status(429).json({
+      erro: "pedido duplicado",
+      detalhe: `Você já pediu isso há ${deb.restamSeg}s. Aguarde 30s antes de repetir pra não queimar créditos do Gugu.`,
+      restamSeg: deb.restamSeg
+    });
+  }
 
   // Sinal forte de "é conto": veio da aba Conto do frontend (nome=Conto-Pedido) OU
   // campo contexto explícito. Não basta detecção por palavras-chave porque títulos
