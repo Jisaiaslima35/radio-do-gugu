@@ -526,14 +526,14 @@ INSTRUÇÃO DE NARRATIVA: quando o ouvinte pede um conto, NÃO gere só a vinhet
 - CLÍMAX + desfecho sombrio (20%): revelação, violência ou horror, fim abrupto
 Total: 1200-1800 chars (~80-120s de narração em speed 0.85). Tom íntimo, gótico, NPR de madrugada. Detalhes sensoriais (cheiro, textura, som), diálogos curtos entre aspas, pausas longas indicadas por "...". SEM markdown, SEM emojis, SEM nomes de ferramentas, SEM prefácio tipo "Vou narrar". Comece DIRETO com a fala do Gugu.
 
-Se NÃO houver match claro do pedido com nenhum conto, diga: "Esse tema não tá no porão do Gugu. Posso te contar [NOME_DO_CONTO_MAIS_PRÓXIMO] do acervo que tem clima parecido — quer que eu mande?". Máx 200 chars.`;
+Se NÃO houver match claro do pedido com nenhum conto, NARRE A HISTÓRIA PEDIDA DE CABEÇA. Você É o Gugu, locutor de histórias de terror com voz sombria e envolvente da madrugada. Crie uma narrativa envolvente de 800 a 1200 caracteres sobre a história ou lenda pedida, mantendo a ambientação noturna, frases curtas e clima de mistério. NÃO cite que buscou fora, NÃO diga que não tinha no acervo, NÃO sugira outro conto. Apenas comece a narrar a história para o ouvinte, como se fosse uma história sua.`;
   }
 
   const promptTerror = `Mural da Rádio do Gugu — pedido do ouvinte ${nome}: "${pedido}". Responda como o Gugu: locutor de histórias de terror, voz grave e envolvente.${catalogoContosBloco}
 ${ehConto ? "" : `Se o pedido for pra tocar uma música brega, gere APENAS a vinheta de chamada (máx 80 chars): "Tá na mão, ${nome}. Vem com o Gugu e o brega que não perdoa."`}
 PT-BR puro, sem markdown, sem nomes de ferramentas, sem versículo bíblico, sem emojis. Fale como se tivesse sussurrando no microfone.
 
-REGRA CRÍTICA: NUNCA invente histórias com "torre de transmissão", "rádio" ou qualquer elemento do cenário da Rádio do Gugu. Se o ouvinte pedir algo que não existe no acervo, escolha o conto do acervo com tema MAIS parecido e avise: "Esse tema não tá no porão do Gugu, mas posso te contar [NOME] que tem clima parecido. Manda ver?".
+REGRA CRÍTICA: NUNCA invente histórias com "torre de transmissão", "rádio" ou qualquer elemento do cenário da Rádio do Gugu. Se o ouvinte pedir algo que não existe no acervo, NARRE a história pedida de cabeça (sombria, 800-1200 chars, voz de madrugada) sem oferecer outro conto nem mencionar que não achou.
 
 IMPORTANTE: responda APENAS com a fala do Gugu — nada de comentários, raciocínio, metadados, contagem de caracteres, prefácio tipo "Resposta:" ou "Dentro do limite:". Comece direto na fala.`;
   return callHermes(
@@ -1167,7 +1167,7 @@ function webDjBasicAuth(req, res, next) {
 app.get("/admin/estudio", webDjBasicAuth, (req, res) => {
   res.set("X-Frame-Options", "SAMEORIGIN");
   res.set("Cache-Control", "no-store");
-  res.set("Content-Security-Policy", "frame-src https://webdj.automacaojs.us; script-src 'self' 'unsafe-inline' https://webdj.automacaojs.us; style-src 'self' 'unsafe-inline' https://webdj.automacaojs.us; img-src 'self' data: https:; connect-src 'self' https://webdj.automacaojs.us wss://webdj.automacaojs.us");
+  res.set("Content-Security-Policy", "frame-src https://webdj.automacaojs.us; script-src 'self' 'unsafe-inline' https://webdj.automacaojs.us; style-src 'self' 'unsafe-inline' https://webdj.automacaojs.us; img-src 'self' data: https:; connect-src 'self' https://webdj.automacaojs.us wss://webdj.automacaojs.us; media-src 'self' blob: https://webdj.automacaojs.us");
   res.type("html").send(`<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -1201,7 +1201,7 @@ app.get("/admin/estudio", webDjBasicAuth, (req, res) => {
     <b>Connect</b>. O AutoDJ vai ceder o microfone e a playlist volta automaticamente quando você desconectar.
     Pra encerrar a sessão, feche esta aba.
   </div>
-  <iframe src="${WEB_DJ_IFRAME_URL}" allow="microphone; camera; autoplay; clipboard-write" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+  <iframe src="${WEB_DJ_IFRAME_URL}" allow="microphone; camera; autoplay; clipboard-read; clipboard-write" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
 </main>
 </body>
 </html>`);

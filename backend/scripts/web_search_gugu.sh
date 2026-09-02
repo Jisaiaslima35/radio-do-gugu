@@ -184,23 +184,50 @@ if cached:
     sys.stdout.write(cached_text)
     sys.exit(0)
 
-# --- 2. Opensearch ---
+# --- 2. Full-text search (MediaWiki srsearch) com opensearch como fallback ---
 api = "https://pt.wikisource.org/w/api.php"
-url = api + "?" + urllib.parse.urlencode({
-    "action": "opensearch",
-    "search": titulo_pedido,
-    "limit": 20,
-    "format": "json",
-})
+candidates = []
+
+# 2a) Primeiro tenta srsearch (full-text): acha termos dentro de obras, não só prefixo de título.
 try:
+    srsearch_query = titulo_pedido
+    if autor_pedido and autor_pedido.lower() not in ("desconhecido", "anônimo", "anonimo", ""):
+        srsearch_query = f"{titulo_pedido} {autor_pedido}"
+    url = api + "?" + urllib.parse.urlencode({
+        "action": "query",
+        "list": "search",
+        "srsearch": srsearch_query,
+        "srlimit": 20,
+        "format": "json",
+    })
     with urllib.request.urlopen(url, timeout=10) as r:
         data = json.load(r)
+    candidates = [item.get("title", "") for item in data.get("query", {}).get("search", []) if item.get("title")]
+    log(f"srsearch retornou {len(candidates)} candidatos: {candidates[:5]}")
 except Exception as e:
-    log(f"opensearch falhou: {e}")
-    sys.exit(3)
+    log(f"srsearch falhou: {e}")
 
-candidates = data[1] if len(data) > 1 else []
-log(f"opensearch retornou {len(candidates)} candidatos: {candidates}")
+# 2b) Fallback opensearch (prefix match) se srsearch não achou nada.
+if not candidates:
+    try:
+        url = api + "?" + urllib.parse.urlencode({
+            "action": "opensearch",
+            "search": titulo_pedido,
+            "limit": 20,
+            "format": "json",
+        })
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = json.load(r)
+        candidates = data[1] if len(data) > 1 else []
+        log(f"opensearch (fallback) retornou {len(candidates)} candidatos: {candidates}")
+    except Exception as e:
+        log(f"opensearch fallback falhou: {e}")
+        sys.exit(3)
+
+if not candidates:
+    log(f"❌ srsearch e opensearch ambos vazios pra {titulo_pedido!r}")
+    sys.stdout.write("__CONTO_NAO_ENCONTRADO__")
+    sys.exit(2)
 
 titulo_norm = re.sub(r'[^\w\s]', ' ', titulo_pedido.lower()).strip()
 titulo_norm = re.sub(r'\s+', ' ', titulo_norm)
@@ -227,8 +254,11 @@ best_text = None
 best_title = None
 best_url = None
 for score, title in ranked:
-    if score <= 0 and best_text:
-        break  # já temos resultado bom, não tenta score zero
+    if score <= 0:
+        # score 0 = título do hit não tem nada a ver com o pedido (ex: srsearch matchou
+        # só uma menção da palavra dentro de um texto qualquer). Descarta.
+        log(f"descartado score={score} (sem match de título): {title}")
+        continue
     log(f"tentando score={score}: {title}")
     data = get_parse(title)
     if not data or 'error' in data:
@@ -246,7 +276,7 @@ for score, title in ranked:
         best_url = "https://pt.wikisource.org/wiki/" + urllib.parse.quote(title)
         break
 
-    # Texto curto: provavelmente índice. Tenta links internos.
+    # Texto curto: provavelmente índice. Tenta links internos (só se score > 0).
     if not best_text:
         # Ordena links por profundidade (mais `/` = mais específico)
         candidate_links = []
